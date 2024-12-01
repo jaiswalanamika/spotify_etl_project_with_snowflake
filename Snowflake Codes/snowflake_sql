@@ -1,0 +1,120 @@
+-- create schema -------------------------------
+create or replace schema project1;
+
+-- create storage integration ------------------
+create or replace storage integration s3_init
+    type = external_stage
+    storage_provider = s3
+    enabled = true
+    storage_aws_role_arn = 'arn:aws:iam::448049805266:role/s3-storage-integration'
+    storage_allowed_locations = ('s3://spotipy-etl-project-anamika/transform_data/')
+    comment = 'connection to s3';
+
+DESC integration s3_init;
+
+-- create file format ---------------------------
+create or replace file format project1_csv_file_format
+TYPE = 'CSV'
+FIELD_DELIMITER = ','
+SKIP_HEADER = 1
+FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+null_if = ('null','null')
+empty_field_as_null = True;
+
+-- album stage------------------------------------
+
+create or replace stage album_stage
+url = 's3://spotipy-etl-project-anamika/transform_data/album_data/'
+file_format = project1_csv_file_format
+storage_integration = s3_init
+
+-- artist stage ----------------------------------
+create or replace stage artist_stage
+url = 's3://spotipy-etl-project-anamika/transform_data/artist_data/'
+file_format = project1_csv_file_format
+storage_integration = s3_init
+
+-- song stage ------------------------------------
+create or replace stage song_stage
+url = 's3://spotipy-etl-project-anamika/transform_data/songs_data/'
+file_format = project1_csv_file_format
+storage_integration = s3_init
+
+-- Create album table ----------------------------
+
+create or replace table album (
+album_id varchar primary key,
+album_name varchar,
+album_release_date date,
+album_total_tracks integer,
+album_url varchar
+);
+
+-- Create artist table -----------------------------
+
+create or replace table artist(
+artist_id varchar,
+artist_name varchar(50),
+external_url varchar);
+
+-- Create songs table ------------------------------
+
+create or replace table songs(
+song_id varchar,
+song_name varchar(150),
+duration_ms int,
+url varchar,
+popularity varchar(50),
+song_added datetime,
+album_id varchar,
+artist_id varchar);
+
+-- create album snowpipe ---------------------
+
+create or replace pipe album_pipe
+auto_ingest = True
+as
+copy into album
+from @album_stage
+file_format = csv_file_format;
+
+desc pipe album_pipe;
+-- copy notification channel from here
+-- Navigate to S3 and select the bucket where your data files are stored.
+-- Go to the Properties tab of the bucket.
+-- Scroll down to the Event Notifications section.
+-- add there
+
+
+-- create artist snowpipe ---------------------
+
+create or replace pipe artist_pipe
+auto_ingest = True
+as
+copy into artist
+from @artist_stage
+file_format = csv_file_format;
+
+desc pipe artist_pipe;
+
+-- create songs snowpipe ---------------------
+
+create or replace pipe songs_pipe
+auto_ingest = True
+as
+copy into songs
+from @song_stage
+file_format = csv_file_format;
+
+desc pipe songs_pipe;
+
+-- print tables-------------------------------------------
+select * from album;
+select * from artist;
+select * from songs;
+
+
+
+
+
+
